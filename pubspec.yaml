@@ -35,8 +35,8 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   # 3.3.x supports Dart 3.11 (Flutter stable before 3.47). 3.4+ needs Dart ^3.12.
-  flutter_riverpod: ^3.3.2
-  riverpod: ^3.3.2
+  flutter_riverpod: ">=3.3.2 <3.4.0"
+  riverpod: ">=3.3.2 <3.4.0"
   shared_preferences: ^2.5.5
   flutter_animate: ^4.5.2
 
