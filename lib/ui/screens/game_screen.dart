@@ -7,7 +7,7 @@ import '../../game/motions.dart';
 import '../../providers/game_provider.dart';
 import '../painter/board_painter.dart';
 import '../theme/neon.dart';
-import '../widgets/control_legend.dart';
+import '../widgets/game_controls.dart';
 import '../widgets/neon_backdrop.dart';
 import '../widgets/playfield.dart';
 
@@ -18,8 +18,22 @@ class GameScreen extends ConsumerStatefulWidget {
   ConsumerState<GameScreen> createState() => _GameScreenState();
 }
 
-class _GameScreenState extends ConsumerState<GameScreen> {
+class _GameScreenState extends ConsumerState<GameScreen>
+    with WidgetsBindingObserver {
   GameNotifier? _game;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) {
+      _game?.pause();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +48,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
         return;
       }
       if (next.lockEpoch != previous.lockEpoch) {
-        if (next.linesCleared > 0) {
+        if (next.lastClear > 0) {
           HapticFeedback.heavyImpact().ignore();
         } else {
           HapticFeedback.mediumImpact().ignore();
@@ -54,6 +68,12 @@ class _GameScreenState extends ConsumerState<GameScreen> {
               child: Column(
                 children: <Widget>[
                   _TopBar(
+                    paused: state.status == GameStatus.paused,
+                    canPause:
+                        state.status == GameStatus.active ||
+                        state.status == GameStatus.paused,
+                    onPause: () =>
+                        ref.read(gameProvider.notifier).togglePause(),
                     onRestart: () => ref.read(gameProvider.notifier).restart(),
                   ),
                   const SizedBox(height: 10),
@@ -61,7 +81,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                   const SizedBox(height: 12),
                   const Expanded(child: Playfield()),
                   const SizedBox(height: 12),
-                  const ControlLegend(),
+                  const GameControls(),
                 ],
               ),
             ),
@@ -72,28 +92,42 @@ class _GameScreenState extends ConsumerState<GameScreen> {
   }
 
   KeyEventResult _onKey(KeyEvent event) {
-    if (event is! KeyDownEvent) {
+    if (event is KeyUpEvent) {
       return KeyEventResult.ignored;
     }
+    final repeat = event is KeyRepeatEvent;
+    final key = event.logicalKey;
     final notifier = ref.read(gameProvider.notifier);
-    final state = ref.read(gameProvider);
-    if (event.logicalKey == LogicalKeyboardKey.keyR) {
+    final status = ref.read(gameProvider).status;
+    if (repeat &&
+        key != LogicalKeyboardKey.arrowLeft &&
+        key != LogicalKeyboardKey.arrowRight &&
+        key != LogicalKeyboardKey.arrowDown) {
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.keyR) {
       notifier.restart();
       return KeyEventResult.handled;
     }
-    if (state.status != GameStatus.active) {
-      if (event.logicalKey == LogicalKeyboardKey.enter ||
-          event.logicalKey == LogicalKeyboardKey.space) {
-        notifier.handlePlayfieldTap(0.5, 0.2);
+    if (key == LogicalKeyboardKey.keyP || key == LogicalKeyboardKey.escape) {
+      notifier.togglePause();
+      return KeyEventResult.handled;
+    }
+    if (status != GameStatus.active) {
+      if (key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.space) {
+        notifier.start();
         return KeyEventResult.handled;
       }
       return KeyEventResult.ignored;
     }
-    final motion = switch (event.logicalKey) {
+    final motion = switch (key) {
       LogicalKeyboardKey.arrowLeft => Motion.left,
       LogicalKeyboardKey.arrowRight => Motion.right,
       LogicalKeyboardKey.arrowDown => Motion.down,
-      LogicalKeyboardKey.arrowUp || LogicalKeyboardKey.space => Motion.rotate,
+      LogicalKeyboardKey.arrowUp || LogicalKeyboardKey.keyX => Motion.rotate,
+      LogicalKeyboardKey.keyZ ||
+      LogicalKeyboardKey.controlLeft => Motion.rotateCounter,
+      LogicalKeyboardKey.space => Motion.hardDrop,
       _ => null,
     };
     if (motion == null) {
@@ -105,14 +139,23 @@ class _GameScreenState extends ConsumerState<GameScreen> {
 
   @override
   void dispose() {
-    _game?.pause();
+    WidgetsBinding.instance.removeObserver(this);
+    _game?.suspend();
     super.dispose();
   }
 }
 
 class _TopBar extends StatelessWidget {
-  const _TopBar({required this.onRestart});
+  const _TopBar({
+    required this.paused,
+    required this.canPause,
+    required this.onPause,
+    required this.onRestart,
+  });
 
+  final bool paused;
+  final bool canPause;
+  final VoidCallback onPause;
   final VoidCallback onRestart;
 
   @override
@@ -131,6 +174,15 @@ class _TopBar extends StatelessWidget {
             style: orbitron(16, letterSpacing: 3, shadows: titleGlow()),
           ),
         ),
+        if (canPause) ...<Widget>[
+          _RoundIcon(
+            key: const Key('pause-button'),
+            icon: paused ? Icons.play_arrow_rounded : Icons.pause_rounded,
+            tooltip: paused ? 'Resume' : 'Pause',
+            onPressed: onPause,
+          ),
+          const SizedBox(width: 8),
+        ],
         _RoundIcon(
           key: const Key('restart-button'),
           icon: Icons.refresh_rounded,
@@ -190,13 +242,25 @@ class _Hud extends StatelessWidget {
     return Row(
       children: <Widget>[
         Expanded(
+          flex: 3,
           child: _Stat(label: 'SCORE', value: state.displayedScore),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 6),
         Expanded(
+          flex: 3,
           child: _Stat(label: 'BEST', value: state.highScore),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 6),
+        Expanded(
+          flex: 2,
+          child: _Stat(label: 'LVL', value: state.level),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          flex: 2,
+          child: _Stat(label: 'LINES', value: state.lines),
+        ),
+        const SizedBox(width: 6),
         _NextWell(state: state),
       ],
     );
@@ -218,7 +282,7 @@ class _Stat extends StatelessWidget {
         border: Border.all(color: Neon.violet.withValues(alpha: 0.35)),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -256,8 +320,8 @@ class _NextWell extends StatelessWidget {
         border: Border.all(color: Neon.cyan.withValues(alpha: 0.35)),
       ),
       child: SizedBox(
-        width: 72,
-        height: 64,
+        width: 64,
+        height: 60,
         child: Column(
           children: <Widget>[
             const SizedBox(height: 4),
@@ -267,10 +331,7 @@ class _NextWell extends StatelessWidget {
             ),
             Expanded(
               child: CustomPaint(
-                painter: PreviewPainter(
-                  cells: state.next?.cells,
-                  colorByte: state.next?.colorByte,
-                ),
+                painter: PreviewPainter(type: state.next),
                 child: const SizedBox.expand(),
               ),
             ),

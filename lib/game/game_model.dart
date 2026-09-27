@@ -1,25 +1,16 @@
 import 'dart:math';
 
 import 'board.dart';
-import 'motions.dart';
 import 'pieces.dart';
 
-/// `AppModel.Statuses`.
-enum GameStatus { awaitingStart, active, over }
+enum GameStatus { awaitingStart, active, paused, over }
 
-/// What one call to [GameModel.generateField] changed.
-class StepResult {
-  const StepResult({
-    this.locked = false,
-    this.linesCleared = 0,
-    this.gameOver = false,
-    this.highScoreUpdated = false,
-  });
+/// What one lock changed.
+class LockResult {
+  const LockResult({required this.linesCleared, required this.gameOver});
 
-  final bool locked;
   final int linesCleared;
   final bool gameOver;
-  final bool highScoreUpdated;
 }
 
 /// Immutable view of the model for Riverpod and the painter.
@@ -28,37 +19,52 @@ class GameSnapshot {
     required this.status,
     required this.score,
     required this.highScore,
-    required this.achievedScore,
+    required this.level,
+    required this.lines,
     required this.field,
+    required this.ghost,
     required this.current,
     required this.next,
-    required this.linesCleared,
+    required this.lastClear,
     required this.lockEpoch,
   });
 
   final GameStatus status;
   final int score;
   final int highScore;
-  final int achievedScore;
+  final int level;
+  final int lines;
+
+  /// Locked cells with the falling piece drawn in.
   final List<List<int>> field;
+
+  /// Where the falling piece would land.
+  final List<CellOffset> ghost;
   final Piece? current;
-  final Piece? next;
-  final int linesCleared;
+  final PieceType? next;
+
+  /// Lines cleared by the most recent lock (0 if none).
+  final int lastClear;
+
+  /// Increments on every lock, so the UI can react once per lock.
   final int lockEpoch;
 
-  /// Score shown in the HUD. Game over keeps the result that was reached.
-  int get displayedScore => status == GameStatus.over ? achievedScore : score;
+  int get displayedScore => score;
 }
 
-/// Port of `AppModel`: movement, rotation, lock, line clear, and game over.
+/// Guideline Tetris rules: SRS rotation with wall kicks, 7-bag, soft and
+/// hard drop, level-based gravity, and standard line-clear scoring.
 class GameModel {
   GameModel({
     int Function(int max)? nextInt,
     this.onHighScore,
     this.highScore = 0,
-  }) : _nextInt = nextInt ?? Random().nextInt;
+  }) : _bag = PieceBag(nextInt ?? Random().nextInt);
 
-  final int Function(int max) _nextInt;
+  static const int linesPerLevel = 10;
+  static const List<int> clearPoints = <int>[0, 100, 300, 500, 800];
+
+  final PieceBag _bag;
   final void Function(int score)? onHighScore;
 
   final Board board = Board();
@@ -66,137 +72,221 @@ class GameModel {
   GameStatus status = GameStatus.awaitingStart;
   int score = 0;
   int highScore;
-  int achievedScore = 0;
+  int lines = 0;
+  int lastClear = 0;
   int lockEpoch = 0;
   Piece? current;
-  Piece? next;
+  PieceType? next;
 
   bool get isActive => status == GameStatus.active;
+  bool get isPaused => status == GameStatus.paused;
   bool get isAwaitingStart => status == GameStatus.awaitingStart;
   bool get isGameOver => status == GameStatus.over;
 
+  int get level => 1 + lines ~/ linesPerLevel;
+
+  /// Guideline gravity: (0.8 − (level − 1) × 0.007)^(level − 1) seconds/row.
+  Duration get gravityInterval {
+    final l = min(level, 20) - 1;
+    final seconds = pow(0.8 - l * 0.007, l).toDouble();
+    return Duration(microseconds: max(16000, (seconds * 1e6).round()));
+  }
+
   void startGame() {
-    if (!isActive) {
-      status = GameStatus.active;
-      current = createPiece(_nextInt);
-      next = createPiece(_nextInt);
+    if (isActive || isPaused) {
+      return;
     }
+    if (isGameOver) {
+      _reset();
+    }
+    status = GameStatus.active;
+    next = _bag.next();
+    _spawn();
   }
 
   void restartGame() {
-    _resetModel();
+    _reset();
     startGame();
   }
 
-  /// Called on the tick after spawn is blocked, matching `AppModel.endGame`.
-  void endGame() {
-    score = 0;
-    status = GameStatus.over;
+  void pause() {
+    if (isActive) {
+      status = GameStatus.paused;
+    }
   }
 
-  void _resetModel() {
-    board.reset(ephemeralOnly: false);
+  void resume() {
+    if (isPaused) {
+      status = GameStatus.active;
+    }
+  }
+
+  void _reset() {
+    board.clear();
     status = GameStatus.awaitingStart;
     score = 0;
-    achievedScore = 0;
+    lines = 0;
+    lastClear = 0;
     lockEpoch = 0;
     current = null;
     next = null;
   }
 
-  StepResult generateField(Motion action) {
+  bool _tryPlace(Piece candidate) {
+    if (!board.fits(candidate)) {
+      return false;
+    }
+    current = candidate;
+    return true;
+  }
+
+  /// Shifts the piece sideways by [dx]. Returns true if it moved.
+  bool move(int dx) {
     final piece = current;
     if (!isActive || piece == null) {
-      return const StepResult();
+      return false;
     }
-
-    board.reset();
-    var frame = piece.frameNumber;
-    var x = piece.x;
-    var y = piece.y;
-
-    switch (action) {
-      case Motion.left:
-        x -= 1;
-      case Motion.right:
-        x += 1;
-      case Motion.down:
-        y += 1;
-      case Motion.rotate:
-        frame += 1;
-        if (frame >= piece.frameCount) {
-          frame = 0;
-        }
-    }
-
-    final shape = piece.cellsForFrame(frame);
-    if (!board.validTranslation(x, y, shape)) {
-      board.translate(piece.x, piece.y, piece.cells);
-      if (action == Motion.down) {
-        return _lockPiece(piece);
-      }
-      return const StepResult();
-    }
-
-    board.translate(x, y, shape);
-    current = piece.copyWith(frameNumber: frame, x: x, y: y);
-    return const StepResult();
+    return _tryPlace(piece.copyWith(x: piece.x + dx));
   }
 
-  StepResult _lockPiece(Piece piece) {
-    final highScoreUpdated = _boostScore();
-    board.persist(piece.colorByte);
-    final linesCleared = board.assess();
-    current = next ?? createPiece(_nextInt);
-    next = createPiece(_nextInt);
-    lockEpoch++;
-
-    final spawned = current;
-    if (spawned == null || !_canPlace(spawned)) {
-      achievedScore = score;
-      status = GameStatus.over;
-      current = null;
-      next = null;
-      board.reset(ephemeralOnly: false);
-      return StepResult(
-        locked: true,
-        linesCleared: linesCleared,
-        gameOver: true,
-        highScoreUpdated: highScoreUpdated,
+  /// SRS rotation with wall kicks. Returns true if the piece turned.
+  bool rotate({bool clockwise = true}) {
+    final piece = current;
+    if (!isActive || piece == null) {
+      return false;
+    }
+    final to = (piece.rotation + (clockwise ? 1 : 3)) % 4;
+    for (final kick in kicksFor(piece.type, piece.rotation, to)) {
+      final candidate = piece.copyWith(
+        rotation: to,
+        x: piece.x + kick.dx,
+        y: piece.y + kick.dy,
       );
-    }
-
-    return StepResult(
-      locked: true,
-      linesCleared: linesCleared,
-      highScoreUpdated: highScoreUpdated,
-    );
-  }
-
-  bool _boostScore() {
-    score += 10;
-    if (score > highScore) {
-      highScore = score;
-      onHighScore?.call(score);
-      return true;
+      if (_tryPlace(candidate)) {
+        return true;
+      }
     }
     return false;
   }
 
-  bool _canPlace(Piece piece) {
-    return board.validTranslation(piece.x, piece.y, piece.cells);
+  /// True when the piece is resting on the stack or the floor.
+  bool get isGrounded {
+    final piece = current;
+    return piece != null && !board.fits(piece.copyWith(y: piece.y + 1));
   }
 
-  GameSnapshot snapshot({StepResult? step}) {
+  /// Gravity step: one row down, no points. Returns true if it moved.
+  bool stepDown() {
+    final piece = current;
+    if (!isActive || piece == null) {
+      return false;
+    }
+    return _tryPlace(piece.copyWith(y: piece.y + 1));
+  }
+
+  /// Player soft drop: one row down for 1 point. Does not lock by itself.
+  bool softDrop() {
+    if (!stepDown()) {
+      return false;
+    }
+    _addScore(1);
+    return true;
+  }
+
+  /// Drops straight to the ghost position for 2 points a row, then locks.
+  LockResult? hardDrop() {
+    final piece = current;
+    if (!isActive || piece == null) {
+      return null;
+    }
+    var rows = 0;
+    while (stepDown()) {
+      rows++;
+    }
+    _addScore(rows * 2);
+    return lock();
+  }
+
+  /// Locks the current piece, clears lines, scores, and spawns the next one.
+  LockResult lock() {
+    final piece = current!;
+    final visible = board.lock(piece);
+    final cleared = board.clearFullRows();
+    _addScore(clearPoints[cleared] * level);
+    lines += cleared;
+    lastClear = cleared;
+    lockEpoch++;
+    current = null;
+
+    if (!visible || !_spawn()) {
+      status = GameStatus.over;
+      current = null;
+      return LockResult(linesCleared: cleared, gameOver: true);
+    }
+    return LockResult(linesCleared: cleared, gameOver: false);
+  }
+
+  /// Brings in the next piece. Returns false on a block out.
+  bool _spawn() {
+    final piece = Piece.spawn(next!, columns: Board.columnCount);
+    next = _bag.next();
+    if (!board.fits(piece)) {
+      status = GameStatus.over;
+      return false;
+    }
+    current = piece;
+    return true;
+  }
+
+  void _addScore(int points) {
+    if (points <= 0) {
+      return;
+    }
+    score += points;
+    if (score > highScore) {
+      highScore = score;
+    }
+  }
+
+  /// Persists the high score if this game set it.
+  void saveHighScore() {
+    if (score > 0 && score >= highScore) {
+      onHighScore?.call(highScore);
+    }
+  }
+
+  List<CellOffset> ghostCells() {
+    var piece = current;
+    if (piece == null) {
+      return const [];
+    }
+    while (board.fits(piece!.copyWith(y: piece.y + 1))) {
+      piece = piece.copyWith(y: piece.y + 1);
+    }
+    return piece.cells.toList(growable: false);
+  }
+
+  GameSnapshot snapshot() {
+    final field = board.copyCells();
+    final piece = current;
+    if (piece != null) {
+      for (final cell in piece.cells) {
+        if (cell.row >= 0) {
+          field[cell.row][cell.col] = piece.colorByte;
+        }
+      }
+    }
     return GameSnapshot(
       status: status,
       score: score,
       highScore: highScore,
-      achievedScore: achievedScore,
-      field: board.copyCells(),
-      current: current,
+      level: level,
+      lines: lines,
+      field: field,
+      ghost: ghostCells(),
+      current: piece,
       next: next,
-      linesCleared: step?.linesCleared ?? 0,
+      lastClear: lastClear,
       lockEpoch: lockEpoch,
     );
   }

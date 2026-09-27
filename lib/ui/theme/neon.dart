@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Dark arcade palette. Block hues follow the Android color bytes, pushed
-/// toward neon so they read on a near-black well.
+/// Dark arcade palette.
 abstract final class Neon {
   static const Color bg = Color(0xFF07010F);
   static const Color bgRaised = Color(0xFF160A28);
@@ -14,12 +13,15 @@ abstract final class Neon {
   static const Color muted = Color(0xFFC4B6E0);
   static const Color grid = Color(0x22F6F2FF);
 
+  /// Guideline piece colors (I, O, T, S, Z, J, L), pushed toward neon.
   static const Map<int, Color> blocks = <int, Color>{
-    2: Color(0xFFFF4DDE),
-    3: Color(0xFF39FF7A),
-    4: Color(0xFFFF9F1C),
-    5: Color(0xFFFFE14A),
-    6: Color(0xFF3DFFF3),
+    2: Color(0xFF3DFFF3),
+    3: Color(0xFFFFE14A),
+    4: Color(0xFFB45CFF),
+    5: Color(0xFF39FF7A),
+    6: Color(0xFFFF3D6E),
+    7: Color(0xFF4D7CFF),
+    8: Color(0xFFFF9F1C),
   };
 
   static Color block(int byte) => blocks[byte] ?? cyan;

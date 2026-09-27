@@ -7,14 +7,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../game/board.dart';
 import '../game/game_model.dart';
 import '../game/motions.dart';
-import '../game/tick.dart';
 import 'high_score_store.dart';
 
 final highScoreStoreProvider = Provider<HighScoreStore>(
   (ref) => SharedPrefsHighScoreStore(),
 );
 
-/// Injected so tests can force a shape and color sequence.
+/// Injected so tests can force a piece sequence.
 final rngProvider = Provider<int Function(int max)>((ref) {
   final random = Random();
   return random.nextInt;
@@ -24,24 +23,31 @@ final gameProvider = NotifierProvider<GameNotifier, GameSnapshot>(
   GameNotifier.new,
 );
 
-/// Owns the model, the 500ms soft-drop loop, and high-score writes.
+/// Owns the model, gravity, lock delay, and high-score writes.
 class GameNotifier extends Notifier<GameSnapshot> {
+  /// Time a grounded piece may still be moved before it locks.
+  static const Duration lockDelay = Duration(milliseconds: 500);
+
+  /// Moves/rotations that may restart the lock delay per new lowest row.
+  static const int maxLockResets = 15;
+
   late GameModel _model;
-  final MoveScheduler _scheduler = MoveScheduler();
-  Timer? _dropTimer;
+  Timer? _gravityTimer;
+  Timer? _lockTimer;
+  int _lockResets = 0;
+  int _lowestRow = -100;
   int _token = 0;
 
   @override
   GameSnapshot build() {
     _token++;
-    _dropTimer?.cancel();
     final token = _token;
+    _cancelTimers();
     final store = ref.read(highScoreStoreProvider);
     _model = GameModel(nextInt: ref.read(rngProvider), onHighScore: store.save);
     ref.onDispose(() {
       if (_token == token) {
-        _dropTimer?.cancel();
-        _dropTimer = null;
+        _cancelTimers();
       }
     });
     unawaited(_loadHighScore(store, token));
@@ -51,6 +57,9 @@ class GameNotifier extends Notifier<GameSnapshot> {
   @visibleForTesting
   Board get debugBoard => _model.board;
 
+  @visibleForTesting
+  GameModel get debugModel => _model;
+
   Future<void> _loadHighScore(HighScoreStore store, int token) async {
     final stored = await store.read();
     if (token != _token) {
@@ -58,93 +67,220 @@ class GameNotifier extends Notifier<GameSnapshot> {
     }
     if (stored > _model.highScore) {
       _model.highScore = stored;
-      state = _model.snapshot();
+      _publish();
     }
   }
 
   /// Fresh awaiting-start session used when the game screen opens.
   void openGame() {
-    _cancelDrop();
-    final best = _model.highScore;
+    _cancelTimers();
     _model = GameModel(
       nextInt: ref.read(rngProvider),
       onHighScore: ref.read(highScoreStoreProvider).save,
-      highScore: best,
+      highScore: _model.highScore,
     );
-    _scheduler.reset();
-    state = _model.snapshot();
+    _publish();
   }
 
-  void pause() {
-    _cancelDrop();
-  }
-
-  void handlePlayfieldTap(double x, double y) {
-    if (_model.isAwaitingStart || _model.isGameOver) {
-      _model.startGame();
-      _scheduler.reset();
-      _commit(Motion.down, reschedule: true);
+  void start() {
+    if (_model.isPaused) {
+      resume();
       return;
     }
     if (_model.isActive) {
-      handleMotion(resolveTouchDirection(x, y));
+      return;
     }
+    _model.startGame();
+    _beginPiece();
+  }
+
+  void restart() {
+    _model.saveHighScore();
+    _model.restartGame();
+    _beginPiece();
+  }
+
+  /// Stops the clocks without publishing, for when the game screen goes away.
+  void suspend() {
+    _cancelTimers();
+  }
+
+  /// Pauses an active game. Safe to call at any time.
+  void pause() {
+    if (!_model.isActive) {
+      _cancelTimers();
+      return;
+    }
+    _model.pause();
+    _cancelTimers();
+    _publish();
+  }
+
+  void resume() {
+    if (!_model.isPaused) {
+      return;
+    }
+    _model.resume();
+    _armGravity();
+    if (_model.isGrounded) {
+      _armLock();
+    }
+    _publish();
+  }
+
+  void togglePause() {
+    if (_model.isPaused) {
+      resume();
+    } else {
+      pause();
+    }
+  }
+
+  void handlePlayfieldTap(double x, double y) {
+    if (!_model.isActive) {
+      start();
+      return;
+    }
+    handleMotion(resolveTouchDirection(x, y));
   }
 
   void handleMotion(Motion motion) {
     if (!_model.isActive) {
       return;
     }
-    if (motion == Motion.down) {
-      // Immediate soft drop. The pending gravity tick is left alone,
-      // matching `TetrisView.setGameCommand` for DOWN. A lock that ends
-      // the game still arms the follow-up tick inside [_commit].
-      _commit(Motion.down, reschedule: false);
+    switch (motion) {
+      case Motion.left:
+        _manipulate(_model.move(-1));
+      case Motion.right:
+        _manipulate(_model.move(1));
+      case Motion.rotate:
+        _manipulate(_model.rotate());
+      case Motion.rotateCounter:
+        _manipulate(_model.rotate(clockwise: false));
+      case Motion.down:
+        if (_model.softDrop()) {
+          _afterFall();
+          // Soft drop replaces the pending gravity step.
+          _armGravity();
+          _publish();
+        } else if (_lockTimer == null) {
+          _armLock();
+        }
+      case Motion.hardDrop:
+        final result = _model.hardDrop();
+        if (result != null) {
+          _afterLock(result);
+        }
+    }
+  }
+
+  void _manipulate(bool moved) {
+    if (!moved) {
       return;
     }
-    _commit(motion, reschedule: true);
+    if (_model.isGrounded) {
+      if (_lockTimer == null || _lockResets < maxLockResets) {
+        if (_lockTimer != null) {
+          _lockResets++;
+        }
+        _armLock();
+      }
+    } else {
+      _cancelLock();
+    }
+    _publish();
   }
 
-  void restart() {
-    _model.restartGame();
-    _scheduler.reset();
-    _commit(Motion.down, reschedule: true);
-  }
-
-  void _commit(Motion motion, {required bool reschedule}) {
-    final result = _model.generateField(motion);
-    if (reschedule) {
-      _scheduler.mark();
+  /// Bookkeeping after the piece moved down a row.
+  void _afterFall() {
+    final y = _model.current!.y;
+    if (y > _lowestRow) {
+      _lowestRow = y;
+      _lockResets = 0;
     }
-    state = _model.snapshot(step: result);
-    if (reschedule || _model.isGameOver) {
-      _armDrop();
+    if (_model.isGrounded) {
+      _armLock();
+    } else {
+      _cancelLock();
     }
   }
 
-  void _armDrop() {
-    _cancelDrop();
-    final token = _token;
-    _dropTimer = Timer(_scheduler.delay, () => _onTick(token));
-  }
-
-  void _onTick(int token) {
-    _dropTimer = null;
-    if (token != _token) {
-      return;
-    }
-    if (_model.isGameOver) {
-      _model.endGame();
-      state = _model.snapshot();
-      return;
-    }
+  void _beginPiece() {
+    _cancelLock();
+    _lockResets = 0;
+    _lowestRow = _model.current?.y ?? -100;
     if (_model.isActive) {
-      _commit(Motion.down, reschedule: true);
+      _armGravity();
+      if (_model.isGrounded) {
+        _armLock();
+      }
+    } else {
+      _cancelTimers();
+    }
+    _publish();
+  }
+
+  void _afterLock(LockResult result) {
+    if (result.gameOver) {
+      _model.saveHighScore();
+      _cancelTimers();
+      _publish();
+      return;
+    }
+    // Re-arms gravity, which also picks up a level change.
+    _beginPiece();
+  }
+
+  void _armGravity() {
+    _gravityTimer?.cancel();
+    final token = _token;
+    _gravityTimer = Timer.periodic(
+      _model.gravityInterval,
+      (_) => _onGravity(token),
+    );
+  }
+
+  void _onGravity(int token) {
+    if (token != _token || !_model.isActive) {
+      return;
+    }
+    if (_model.stepDown()) {
+      _afterFall();
+      _publish();
+    } else if (_lockTimer == null) {
+      _armLock();
     }
   }
 
-  void _cancelDrop() {
-    _dropTimer?.cancel();
-    _dropTimer = null;
+  void _armLock() {
+    _lockTimer?.cancel();
+    final token = _token;
+    _lockTimer = Timer(lockDelay, () => _onLock(token));
+  }
+
+  void _onLock(int token) {
+    _lockTimer = null;
+    if (token != _token || !_model.isActive) {
+      return;
+    }
+    if (!_model.isGrounded) {
+      return;
+    }
+    _afterLock(_model.lock());
+  }
+
+  void _cancelLock() {
+    _lockTimer?.cancel();
+    _lockTimer = null;
+  }
+
+  void _cancelTimers() {
+    _gravityTimer?.cancel();
+    _gravityTimer = null;
+    _cancelLock();
+  }
+
+  void _publish() {
+    state = _model.snapshot();
   }
 }

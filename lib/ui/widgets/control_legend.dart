@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/neon.dart';
 
-/// The four playfield zones, in the same order a player meets them.
+/// Summary of the controls shown on the landing screen.
 class ControlLegend extends StatelessWidget {
   const ControlLegend({super.key});
 
@@ -15,7 +15,8 @@ class ControlLegend extends StatelessWidget {
       children: <Widget>[
         _Chip(icon: Icons.west_rounded, label: 'LEFT'),
         _Chip(icon: Icons.rotate_right_rounded, label: 'ROTATE'),
-        _Chip(icon: Icons.south_rounded, label: 'DROP'),
+        _Chip(icon: Icons.south_rounded, label: 'DOWN'),
+        _Chip(icon: Icons.keyboard_double_arrow_down_rounded, label: 'DROP'),
         _Chip(icon: Icons.east_rounded, label: 'RIGHT'),
       ],
     );

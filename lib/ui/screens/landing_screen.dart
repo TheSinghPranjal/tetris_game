@@ -118,7 +118,7 @@ class LandingScreen extends ConsumerWidget {
                         const ControlLegend(),
                         const SizedBox(height: 8),
                         Text(
-                          'Tap a zone on the well',
+                          'Use the pad below the well, or arrow keys',
                           style: rajdhani(
                             13,
                             color: Neon.muted.withValues(alpha: 0.8),

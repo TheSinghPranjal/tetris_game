@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../game/game_model.dart';
@@ -61,14 +62,17 @@ class Playfield extends ConsumerWidget {
                       CustomPaint(
                         painter: BoardPainter(
                           field: state.field,
-                          fallingColor: state.current?.colorByte,
-                          lineFlash: state.linesCleared > 0,
+                          ghost: state.ghost,
+                          ghostColor: state.current?.colorByte,
                         ),
                       ),
-                      if (state.linesCleared > 0)
+                      if (state.lastClear > 0)
                         Align(
                           alignment: const Alignment(0, -0.72),
-                          child: _LineCallout(lines: state.linesCleared),
+                          child: _LineCallout(
+                            key: ValueKey<int>(state.lockEpoch),
+                            lines: state.lastClear,
+                          ),
                         ),
                       if (state.status != GameStatus.active)
                         _BoardMessage(state: state),
@@ -89,28 +93,42 @@ abstract final class BoardAspect {
 }
 
 class _LineCallout extends StatelessWidget {
-  const _LineCallout({required this.lines});
+  const _LineCallout({super.key, required this.lines});
 
   final int lines;
 
   @override
   Widget build(BuildContext context) {
-    final label = lines == 1 ? '1 LINE' : '$lines LINES';
+    final label = switch (lines) {
+      1 => 'SINGLE',
+      2 => 'DOUBLE',
+      3 => 'TRIPLE',
+      _ => 'TETRIS!',
+    };
     return IgnorePointer(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: const Color(0xCC07010F),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: Neon.amber.withValues(alpha: 0.8)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-          child: Text(
-            label,
-            style: orbitron(13, color: Neon.amber, letterSpacing: 2),
-          ),
-        ),
-      ),
+      child:
+          DecoratedBox(
+                decoration: BoxDecoration(
+                  color: const Color(0xCC07010F),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: Neon.amber.withValues(alpha: 0.8)),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 6,
+                  ),
+                  child: Text(
+                    label,
+                    style: orbitron(13, color: Neon.amber, letterSpacing: 2),
+                  ),
+                ),
+              )
+              .animate()
+              .fadeIn(duration: 120.ms)
+              .scale(begin: const Offset(0.8, 0.8), duration: 160.ms)
+              .then(delay: 700.ms)
+              .fadeOut(duration: 300.ms),
     );
   }
 }
@@ -123,6 +141,7 @@ class _BoardMessage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final over = state.status == GameStatus.over;
+    final paused = state.status == GameStatus.paused;
     return IgnorePointer(
       child: DecoratedBox(
         decoration: const BoxDecoration(color: Color(0xB307010F)),
@@ -133,7 +152,11 @@ class _BoardMessage extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 Text(
-                  over ? 'GAME OVER' : 'TAP TO START',
+                  over
+                      ? 'GAME OVER'
+                      : paused
+                      ? 'PAUSED'
+                      : 'TAP TO START',
                   textAlign: TextAlign.center,
                   style: orbitron(
                     over ? 26 : 22,
@@ -150,6 +173,13 @@ class _BoardMessage extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     'TAP TO PLAY',
+                    style: rajdhani(16, color: Neon.cyan, letterSpacing: 2),
+                  ),
+                ],
+                if (paused) ...<Widget>[
+                  const SizedBox(height: 10),
+                  Text(
+                    'TAP TO RESUME',
                     style: rajdhani(16, color: Neon.cyan, letterSpacing: 2),
                   ),
                 ],

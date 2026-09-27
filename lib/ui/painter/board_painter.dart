@@ -3,19 +3,20 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
 import '../../game/board.dart';
+import '../../game/pieces.dart';
 import '../theme/neon.dart';
 
 /// Crisp well, grid, and glowing cells for the 20×10 field.
 class BoardPainter extends CustomPainter {
   const BoardPainter({
     required this.field,
-    required this.fallingColor,
-    required this.lineFlash,
+    required this.ghost,
+    required this.ghostColor,
   });
 
   final List<List<int>> field;
-  final int? fallingColor;
-  final bool lineFlash;
+  final List<CellOffset> ghost;
+  final int? ghostColor;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -40,15 +41,34 @@ class BoardPainter extends CustomPainter {
     }
 
     const inset = 1.5;
+    if (ghostColor != null) {
+      final ghostPaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5
+        ..color = Neon.block(ghostColor!).withValues(alpha: 0.55);
+      for (final spot in ghost) {
+        if (spot.row < 0 || field[spot.row][spot.col] != Cell.empty) {
+          continue;
+        }
+        final rect = Rect.fromLTWH(
+          spot.col * cell + inset + 1,
+          spot.row * cell + inset + 1,
+          cell - inset * 2 - 2,
+          cell - inset * 2 - 2,
+        );
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(rect, const Radius.circular(3)),
+          ghostPaint,
+        );
+      }
+    }
     for (var row = 0; row < rows; row++) {
       for (var column = 0; column < cols; column++) {
         final value = field[row][column];
         if (value == Cell.empty) {
           continue;
         }
-        final color = value == Cell.ephemeral
-            ? Neon.block(fallingColor ?? 6)
-            : Neon.block(value);
+        final color = Neon.block(value);
         final rect = Rect.fromLTWH(
           column * cell + inset,
           row * cell + inset,
@@ -57,10 +77,6 @@ class BoardPainter extends CustomPainter {
         );
         _paintCell(canvas, rect, color);
       }
-    }
-
-    if (lineFlash) {
-      canvas.drawRRect(well, Paint()..color = const Color(0x33FFFFFF));
     }
 
     final border = Paint()
@@ -111,14 +127,16 @@ class BoardPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant BoardPainter oldDelegate) {
     return oldDelegate.field != field ||
-        oldDelegate.fallingColor != fallingColor ||
-        oldDelegate.lineFlash != lineFlash;
+        oldDelegate.ghost != ghost ||
+        oldDelegate.ghostColor != ghostColor;
   }
 }
 
 /// Small 4×4 preview of the upcoming piece.
 class PreviewPainter extends CustomPainter {
-  const PreviewPainter({required this.cells, required this.colorByte});
+  PreviewPainter({required PieceType? type})
+    : cells = type == null ? null : previewMatrix(type),
+      colorByte = type?.colorByte;
 
   final List<List<int>>? cells;
   final int? colorByte;

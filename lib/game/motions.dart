@@ -1,10 +1,9 @@
-/// Motions from `AppModel.Motions`.
-enum Motion { left, right, down, rotate }
+/// Player inputs.
+enum Motion { left, right, down, rotate, rotateCounter, hardDrop }
 
-/// Diagonal split used by `GameActivity.resolveTouchDirection`.
+/// Diagonal split of the playfield into four tap zones.
 ///
 /// Normalized [x] and [y] are in the 0–1 range of the playfield.
-/// Returns 0 left, 1 rotate, 2 down, 3 right — mapped here to [Motion].
 Motion resolveTouchDirection(double x, double y) {
   if (y > x) {
     if (x > 1 - y) {
