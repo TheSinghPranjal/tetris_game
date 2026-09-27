@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -8,15 +9,21 @@ import '../theme/neon.dart';
 
 /// Crisp well, grid, and glowing cells for the 20×10 field.
 class BoardPainter extends CustomPainter {
-  const BoardPainter({
+  BoardPainter({
     required this.field,
     required this.ghost,
     required this.ghostColor,
-  });
+    this.clearingRows = const <int>[],
+    this.clear,
+  }) : super(repaint: clear);
 
   final List<List<int>> field;
   final List<CellOffset> ghost;
   final int? ghostColor;
+
+  /// Full rows being removed, animated by [clear] from 0 to 1.
+  final List<int> clearingRows;
+  final Animation<double>? clear;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -62,10 +69,19 @@ class BoardPainter extends CustomPainter {
         );
       }
     }
+    final t = clearingRows.isEmpty ? 0.0 : (clear?.value ?? 0.0);
+    for (final row in clearingRows) {
+      _paintClearBand(canvas, board.width, row, cell, t);
+    }
     for (var row = 0; row < rows; row++) {
+      final clearing = clearingRows.contains(row);
       for (var column = 0; column < cols; column++) {
         final value = field[row][column];
         if (value == Cell.empty) {
+          continue;
+        }
+        if (clearing) {
+          _paintClearingCell(canvas, row, column, cols, cell, value, t);
           continue;
         }
         final color = Neon.block(value);
@@ -87,6 +103,75 @@ class BoardPainter extends CustomPainter {
         Neon.magenta,
       ]);
     canvas.drawRRect(well, border);
+  }
+
+  /// Glowing band behind a clearing row: swells, then fades out.
+  void _paintClearBand(
+    Canvas canvas,
+    double width,
+    int row,
+    double cell,
+    double t,
+  ) {
+    final strength = math.sin(math.pi * t.clamp(0.0, 1.0));
+    final band = Rect.fromLTWH(0, row * cell, width, cell);
+    canvas.drawRect(
+      band.inflate(cell * 0.35 * strength),
+      Paint()
+        ..color = Colors.white.withValues(alpha: 0.28 * strength)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, cell * 0.6),
+    );
+    canvas.drawRect(
+      Rect.fromCenter(
+        center: band.center,
+        width: width * (1 - t * 0.6),
+        height: 2,
+      ),
+      Paint()..color = Neon.cyan.withValues(alpha: 0.9 * strength),
+    );
+  }
+
+  /// A block in a clearing row: flashes white, then shrinks and sparks,
+  /// starting in the middle of the row and moving out to the walls.
+  void _paintClearingCell(
+    Canvas canvas,
+    int row,
+    int column,
+    int cols,
+    double cell,
+    int value,
+    double t,
+  ) {
+    const inset = 1.5;
+    final flash = (t / 0.3).clamp(0.0, 1.0);
+    final distance = ((column + 0.5) - cols / 2).abs() / (cols / 2);
+    final start = 0.3 + 0.35 * distance;
+    final gone = ((t - start) / 0.3).clamp(0.0, 1.0);
+    if (gone >= 1) {
+      return;
+    }
+    final center = Offset((column + 0.5) * cell, (row + 0.5) * cell);
+    final side = (cell - inset * 2) * (1 - gone);
+    final color = Color.lerp(Neon.block(value), Colors.white, flash * 0.85)!;
+    _paintCell(
+      canvas,
+      Rect.fromCenter(center: center, width: side, height: side),
+      color.withValues(alpha: 1 - gone * 0.6),
+    );
+    if (gone > 0) {
+      final spark = Paint()
+        ..color = Neon.block(value).withValues(alpha: 1 - gone)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5);
+      final reach = cell * 0.9 * gone;
+      for (var i = 0; i < 4; i++) {
+        final angle = (i * math.pi / 2) + column * 0.7 + row * 0.3;
+        canvas.drawCircle(
+          center + Offset(math.cos(angle), math.sin(angle)) * reach,
+          cell * 0.07 * (1 - gone) + 0.8,
+          spark,
+        );
+      }
+    }
   }
 
   void _paintCell(Canvas canvas, Rect rect, Color color) {
@@ -127,6 +212,8 @@ class BoardPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant BoardPainter oldDelegate) {
     return oldDelegate.field != field ||
+        oldDelegate.clearingRows != clearingRows ||
+        oldDelegate.clear != clear ||
         oldDelegate.ghost != ghost ||
         oldDelegate.ghostColor != ghostColor;
   }

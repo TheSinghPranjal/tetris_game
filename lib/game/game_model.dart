@@ -26,6 +26,7 @@ class GameSnapshot {
     required this.current,
     required this.next,
     required this.lastClear,
+    required this.clearingRows,
     required this.lockEpoch,
   });
 
@@ -45,6 +46,9 @@ class GameSnapshot {
 
   /// Lines cleared by the most recent lock (0 if none).
   final int lastClear;
+
+  /// Full rows still on the board while the line-clear animation plays.
+  final List<int> clearingRows;
 
   /// Increments on every lock, so the UI can react once per lock.
   final int lockEpoch;
@@ -75,6 +79,7 @@ class GameModel {
   int lines = 0;
   int lastClear = 0;
   int lockEpoch = 0;
+  List<int> clearingRows = const <int>[];
   Piece? current;
   PieceType? next;
 
@@ -82,6 +87,9 @@ class GameModel {
   bool get isPaused => status == GameStatus.paused;
   bool get isAwaitingStart => status == GameStatus.awaitingStart;
   bool get isGameOver => status == GameStatus.over;
+
+  /// True between a lock that filled rows and [finishClear].
+  bool get isClearing => clearingRows.isNotEmpty;
 
   int get level => 1 + lines ~/ linesPerLevel;
 
@@ -128,6 +136,7 @@ class GameModel {
     lines = 0;
     lastClear = 0;
     lockEpoch = 0;
+    clearingRows = const <int>[];
     current = null;
     next = null;
   }
@@ -207,20 +216,38 @@ class GameModel {
     return lock();
   }
 
-  /// Locks the current piece, clears lines, scores, and spawns the next one.
+  /// Locks the current piece and scores any full rows.
+  ///
+  /// Full rows stay on the board (see [clearingRows]) so the UI can animate
+  /// them; call [finishClear] to collapse them and spawn the next piece.
+  /// Without full rows the next piece spawns right away.
   LockResult lock() {
     final piece = current!;
     final visible = board.lock(piece);
-    final cleared = board.clearFullRows();
-    _addScore(clearPoints[cleared] * level);
-    lines += cleared;
-    lastClear = cleared;
+    final full = board.fullRows();
+    _addScore(clearPoints[full.length] * level);
+    lines += full.length;
+    lastClear = full.length;
     lockEpoch++;
     current = null;
 
-    if (!visible || !_spawn()) {
+    if (!visible) {
       status = GameStatus.over;
-      current = null;
+      return LockResult(linesCleared: full.length, gameOver: true);
+    }
+    if (full.isNotEmpty) {
+      clearingRows = full;
+      return LockResult(linesCleared: full.length, gameOver: false);
+    }
+    return finishClear();
+  }
+
+  /// Collapses the rows from the last lock and spawns the next piece.
+  LockResult finishClear() {
+    final cleared = clearingRows.length;
+    board.removeRows(clearingRows);
+    clearingRows = const <int>[];
+    if (!_spawn()) {
       return LockResult(linesCleared: cleared, gameOver: true);
     }
     return LockResult(linesCleared: cleared, gameOver: false);
@@ -287,6 +314,7 @@ class GameModel {
       current: piece,
       next: next,
       lastClear: lastClear,
+      clearingRows: clearingRows,
       lockEpoch: lockEpoch,
     );
   }

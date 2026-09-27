@@ -132,6 +132,40 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets('cleared rows animate, then collapse and spawn', (tester) async {
+    final container = await openGame(tester, MemoryHighScoreStore());
+    await tester.tap(find.byKey(const Key('playfield')));
+    await tester.pump();
+    final notifier = container.read(gameProvider.notifier);
+    // The first piece is the O over columns 4–5; leave that gap in two rows.
+    for (final row in [18, 19]) {
+      for (var col = 0; col < 10; col++) {
+        notifier.debugBoard.cells[row][col] = col == 4 || col == 5 ? 0 : 9;
+      }
+    }
+    await tester.tap(find.byKey(const Key('control-drop')));
+    await tester.pump();
+
+    var state = container.read(gameProvider);
+    expect(state.clearingRows, [18, 19]);
+    expect(state.current, isNull);
+    expect(state.lines, 2);
+
+    // Input is ignored while the rows clear.
+    await tester.tap(find.byKey(const Key('control-left')));
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(container.read(gameProvider).clearingRows, [18, 19]);
+
+    await tester.pump(GameNotifier.clearDelay);
+    state = container.read(gameProvider);
+    expect(state.clearingRows, isEmpty);
+    expect(state.current, isNotNull);
+    expect(state.field[19].every((c) => c == 0), isTrue);
+    expect(find.text('DOUBLE'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('pause freezes the game', (tester) async {
     final container = await openGame(tester, MemoryHighScoreStore());
     await tester.tap(find.byKey(const Key('playfield')));

@@ -31,9 +31,13 @@ class GameNotifier extends Notifier<GameSnapshot> {
   /// Moves/rotations that may restart the lock delay per new lowest row.
   static const int maxLockResets = 15;
 
+  /// Line-clear delay: full rows flash and break up before collapsing.
+  static const Duration clearDelay = Duration(milliseconds: 420);
+
   late GameModel _model;
   Timer? _gravityTimer;
   Timer? _lockTimer;
+  Timer? _clearTimer;
   int _lockResets = 0;
   int _lowestRow = -100;
   int _token = 0;
@@ -121,9 +125,13 @@ class GameNotifier extends Notifier<GameSnapshot> {
       return;
     }
     _model.resume();
-    _armGravity();
-    if (_model.isGrounded) {
-      _armLock();
+    if (_model.isClearing) {
+      _armClear();
+    } else {
+      _armGravity();
+      if (_model.isGrounded) {
+        _armLock();
+      }
     }
     _publish();
   }
@@ -145,7 +153,7 @@ class GameNotifier extends Notifier<GameSnapshot> {
   }
 
   void handleMotion(Motion motion) {
-    if (!_model.isActive) {
+    if (!_model.isActive || _model.isClearing) {
       return;
     }
     switch (motion) {
@@ -227,8 +235,26 @@ class GameNotifier extends Notifier<GameSnapshot> {
       _publish();
       return;
     }
+    if (_model.isClearing) {
+      _cancelTimers();
+      _armClear();
+      _publish();
+      return;
+    }
     // Re-arms gravity, which also picks up a level change.
     _beginPiece();
+  }
+
+  void _armClear() {
+    _clearTimer?.cancel();
+    final token = _token;
+    _clearTimer = Timer(clearDelay, () {
+      _clearTimer = null;
+      if (token != _token || !_model.isActive || !_model.isClearing) {
+        return;
+      }
+      _afterLock(_model.finishClear());
+    });
   }
 
   void _armGravity() {
@@ -241,7 +267,7 @@ class GameNotifier extends Notifier<GameSnapshot> {
   }
 
   void _onGravity(int token) {
-    if (token != _token || !_model.isActive) {
+    if (token != _token || !_model.isActive || _model.isClearing) {
       return;
     }
     if (_model.stepDown()) {
@@ -277,6 +303,8 @@ class GameNotifier extends Notifier<GameSnapshot> {
   void _cancelTimers() {
     _gravityTimer?.cancel();
     _gravityTimer = null;
+    _clearTimer?.cancel();
+    _clearTimer = null;
     _cancelLock();
   }
 

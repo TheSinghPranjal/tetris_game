@@ -125,6 +125,8 @@ void main() {
       model.current = const Piece(type: PieceType.i, rotation: 1, x: 7, y: 0);
       final scoreBefore = model.score;
       final result = model.hardDrop()!;
+      expect(model.clearingRows, hasLength(count));
+      model.finishClear();
       // The I falls from rows 0–3 to rows 16–19: 16 rows of hard drop.
       expect(result.linesCleared, count);
       expect(model.lines, count);
@@ -140,6 +142,15 @@ void main() {
     place(model, PieceType.o);
     final result = model.hardDrop()!;
     expect(result.linesCleared, 2);
+    // Full rows wait on the board for the clear animation.
+    expect(model.isClearing, isTrue);
+    expect(model.clearingRows, [18, 19]);
+    expect(model.current, isNull);
+    expect(model.board.cells[19].every((c) => c != Cell.empty), isTrue);
+
+    model.finishClear();
+    expect(model.isClearing, isFalse);
+    expect(model.current, isNotNull);
     expect(model.board.cells[19][0], 9);
     expect(model.board.cells[18].every((c) => c == Cell.empty), isTrue);
     expect(model.board.cells[17].every((c) => c == Cell.empty), isTrue);

@@ -7,11 +7,43 @@ import '../../providers/game_provider.dart';
 import '../painter/board_painter.dart';
 import '../theme/neon.dart';
 
-class Playfield extends ConsumerWidget {
+class Playfield extends ConsumerStatefulWidget {
   const Playfield({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<Playfield> createState() => _PlayfieldState();
+}
+
+class _PlayfieldState extends ConsumerState<Playfield>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _clear = AnimationController(
+    vsync: this,
+    duration: GameNotifier.clearDelay,
+  );
+
+  @override
+  void dispose() {
+    _clear.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    ref.listen(gameProvider, (previous, next) {
+      if (next.clearingRows.isEmpty) {
+        return;
+      }
+      final newLock = previous == null || previous.lockEpoch != next.lockEpoch;
+      final resumed =
+          previous?.status == GameStatus.paused &&
+          next.status == GameStatus.active;
+      if (newLock || resumed) {
+        // A resume restarts the clear delay, so replay the whole effect.
+        _clear.forward(from: 0);
+      } else if (next.status == GameStatus.paused) {
+        _clear.stop();
+      }
+    });
     final state = ref.watch(gameProvider);
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -64,6 +96,8 @@ class Playfield extends ConsumerWidget {
                           field: state.field,
                           ghost: state.ghost,
                           ghostColor: state.current?.colorByte,
+                          clearingRows: state.clearingRows,
+                          clear: _clear,
                         ),
                       ),
                       if (state.lastClear > 0)

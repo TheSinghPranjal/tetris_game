@@ -47,20 +47,20 @@ class Board {
     return visible;
   }
 
-  /// Removes every full row, drops the stack, and returns how many cleared.
-  int clearFullRows() {
-    var cleared = 0;
-    for (var row = rowCount - 1; row >= 0;) {
-      if (cells[row].every((cell) => cell != Cell.empty)) {
-        cells.removeAt(row);
-        cells.insert(0, _emptyRow());
-        cleared++;
-        // Re-check the same index: the row above has moved into it.
-      } else {
-        row--;
-      }
+  /// Indexes of every full row, top to bottom.
+  List<int> fullRows() => <int>[
+    for (var row = 0; row < rowCount; row++)
+      if (cells[row].every((cell) => cell != Cell.empty)) row,
+  ];
+
+  /// Removes [rows] and drops the stack above them.
+  void removeRows(List<int> rows) {
+    for (final row in rows.toList()..sort((a, b) => b.compareTo(a))) {
+      cells.removeAt(row);
     }
-    return cleared;
+    while (cells.length < rowCount) {
+      cells.insert(0, _emptyRow());
+    }
   }
 
   List<List<int>> copyCells() =>
