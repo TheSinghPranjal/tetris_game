@@ -18,25 +18,25 @@ class GameControls extends ConsumerWidget {
         ref.read(gameProvider.notifier).handleMotion(motion);
 
     return SizedBox(
-      height: 64,
+      height: 80,
       child: Row(
         children: <Widget>[
           _PadButton(
             key: const Key('control-left'),
-            icon: Icons.west_rounded,
+            icon: Icons.arrow_back_rounded,
             label: 'LEFT',
             repeat: true,
             onPress: () => send(Motion.left),
           ),
           _PadButton(
             key: const Key('control-rotate'),
-            icon: Icons.rotate_right_rounded,
+            icon: Icons.autorenew_rounded,
             label: 'ROTATE',
             onPress: () => send(Motion.rotate),
           ),
           _PadButton(
             key: const Key('control-down'),
-            icon: Icons.south_rounded,
+            icon: Icons.arrow_downward_rounded,
             label: 'DOWN',
             repeat: true,
             onPress: () => send(Motion.down),
@@ -50,7 +50,7 @@ class GameControls extends ConsumerWidget {
           ),
           _PadButton(
             key: const Key('control-right'),
-            icon: Icons.east_rounded,
+            icon: Icons.arrow_forward_rounded,
             label: 'RIGHT',
             repeat: true,
             onPress: () => send(Motion.right),
@@ -137,7 +137,7 @@ class _PadButtonState extends State<_PadButton> {
     final accent = widget.accent;
     return Expanded(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 4),
         child: Semantics(
           button: true,
           label: widget.label,
@@ -147,36 +147,64 @@ class _PadButtonState extends State<_PadButton> {
             onPointerDown: _down,
             onPointerUp: _up,
             onPointerCancel: _up,
-            child: AnimatedContainer(
+            child: AnimatedScale(
+              scale: pressed ? 0.94 : 1,
               duration: const Duration(milliseconds: 80),
-              decoration: BoxDecoration(
-                color: pressed
-                    ? accent.withValues(alpha: 0.22)
-                    : const Color(0x8812081C),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: accent.withValues(alpha: pressed ? 0.9 : 0.4),
-                  width: pressed ? 1.6 : 1,
-                ),
-                boxShadow: pressed
-                    ? <BoxShadow>[
-                        BoxShadow(
-                          color: accent.withValues(alpha: 0.35),
-                          blurRadius: 14,
-                        ),
-                      ]
-                    : null,
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: <Widget>[
-                  Icon(widget.icon, size: 24, color: accent),
-                  const SizedBox(height: 4),
-                  Text(
-                    widget.label,
-                    style: rajdhani(11, color: Neon.muted, letterSpacing: 1),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 80),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: pressed
+                        ? <Color>[
+                            accent.withValues(alpha: 0.32),
+                            accent.withValues(alpha: 0.14),
+                          ]
+                        : const <Color>[Color(0xB3141038), Color(0xCC0A0620)],
                   ),
-                ],
+                  border: Border.all(
+                    color: accent.withValues(alpha: pressed ? 1 : 0.85),
+                    width: pressed ? 2 : 1.6,
+                  ),
+                  boxShadow: <BoxShadow>[
+                    BoxShadow(
+                      color: accent.withValues(alpha: pressed ? 0.6 : 0.3),
+                      blurRadius: pressed ? 20 : 12,
+                      spreadRadius: -2,
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    Icon(
+                      widget.icon,
+                      size: 28,
+                      color: accent,
+                      shadows: <Shadow>[
+                        Shadow(
+                          color: accent.withValues(alpha: 0.8),
+                          blurRadius: 10,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        widget.label,
+                        style: rajdhani(
+                          14,
+                          color: Neon.ink,
+                          weight: FontWeight.w700,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

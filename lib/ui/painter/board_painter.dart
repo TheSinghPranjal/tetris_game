@@ -7,6 +7,58 @@ import '../../game/board.dart';
 import '../../game/pieces.dart';
 import '../theme/neon.dart';
 
+/// Glossy glass block: soft glow, top-lit gradient, and a shine band.
+void paintNeonCell(Canvas canvas, Rect rect, Color color) {
+  final radius = Radius.circular(rect.shortestSide * 0.22);
+  final body = RRect.fromRectAndRadius(rect, radius);
+  final alpha = color.a;
+  canvas.drawRRect(
+    body.inflate(1.2),
+    Paint()
+      ..color = color.withValues(alpha: 0.5 * alpha)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+  );
+  canvas.drawRRect(
+    body,
+    Paint()
+      ..shader = ui.Gradient.linear(
+        rect.topCenter,
+        rect.bottomCenter,
+        [
+          Color.lerp(color, Colors.white, 0.3)!,
+          color,
+          Color.lerp(color, Colors.black, 0.22)!,
+        ],
+        const [0, 0.5, 1],
+      ),
+  );
+  // Gel shine across the top.
+  final highlight = RRect.fromRectAndRadius(
+    Rect.fromLTWH(
+      rect.left + rect.width * 0.14,
+      rect.top + rect.height * 0.09,
+      rect.width * 0.72,
+      rect.height * 0.2,
+    ),
+    Radius.circular(rect.height * 0.1),
+  );
+  canvas.drawRRect(
+    highlight,
+    Paint()..color = Colors.white.withValues(alpha: 0.5 * alpha),
+  );
+  canvas.drawRRect(
+    body.deflate(0.5),
+    Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..color = Color.lerp(
+        color,
+        Colors.white,
+        0.45,
+      )!.withValues(alpha: 0.7 * alpha),
+  );
+}
+
 /// Crisp well, grid, and glowing cells for the 20×10 field.
 class BoardPainter extends CustomPainter {
   BoardPainter({
@@ -16,6 +68,9 @@ class BoardPainter extends CustomPainter {
     this.clearingRows = const <int>[],
     this.clear,
   }) : super(repaint: clear);
+
+  /// Corner radius of the well, shared with the playfield frame.
+  static const double radius = 20;
 
   final List<List<int>> field;
   final List<CellOffset> ghost;
@@ -31,12 +86,12 @@ class BoardPainter extends CustomPainter {
     final cols = rows == 0 ? Board.columnCount : field.first.length;
     final cell = size.width / cols;
     final board = Rect.fromLTWH(0, 0, size.width, cell * rows);
-    final well = RRect.fromRectAndRadius(board, const Radius.circular(16));
+    final well = RRect.fromRectAndRadius(board, const Radius.circular(radius));
 
-    canvas.drawRRect(well, Paint()..color = Neon.well);
+    canvas.drawRRect(well, Paint()..color = const Color(0xE6060414));
 
     final grid = Paint()
-      ..color = const Color(0x18F6F2FF)
+      ..color = const Color(0x1A7FA8FF)
       ..strokeWidth = 1;
     for (var column = 1; column < cols; column++) {
       final x = column * cell;
@@ -91,18 +146,19 @@ class BoardPainter extends CustomPainter {
           cell - inset * 2,
           cell - inset * 2,
         );
-        _paintCell(canvas, rect, color);
+        paintNeonCell(canvas, rect, color);
       }
     }
 
     final border = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.6
-      ..shader = ui.Gradient.linear(board.topLeft, board.bottomRight, const [
-        Neon.cyan,
-        Neon.magenta,
+      ..strokeWidth = 2
+      ..shader = ui.Gradient.linear(board.topCenter, board.bottomCenter, const [
+        Color(0xFF6FE7FF),
+        Color(0xFF3D7BFF),
+        Color(0xFF6FE7FF),
       ]);
-    canvas.drawRRect(well, border);
+    canvas.drawRRect(well.deflate(1), border);
   }
 
   /// Glowing band behind a clearing row: swells, then fades out.
@@ -153,7 +209,7 @@ class BoardPainter extends CustomPainter {
     final center = Offset((column + 0.5) * cell, (row + 0.5) * cell);
     final side = (cell - inset * 2) * (1 - gone);
     final color = Color.lerp(Neon.block(value), Colors.white, flash * 0.85)!;
-    _paintCell(
+    paintNeonCell(
       canvas,
       Rect.fromCenter(center: center, width: side, height: side),
       color.withValues(alpha: 1 - gone * 0.6),
@@ -174,41 +230,6 @@ class BoardPainter extends CustomPainter {
     }
   }
 
-  void _paintCell(Canvas canvas, Rect rect, Color color) {
-    final radius = Radius.circular(rect.shortestSide * 0.18);
-    final body = RRect.fromRectAndRadius(rect, radius);
-    canvas.drawRRect(
-      body.inflate(1.2),
-      Paint()
-        ..color = color.withValues(alpha: 0.45)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.5),
-    );
-    canvas.drawRRect(
-      body,
-      Paint()
-        ..shader = ui.Gradient.linear(
-          rect.topLeft,
-          rect.bottomRight,
-          [
-            Color.lerp(color, Colors.white, 0.28)!,
-            color,
-            Color.lerp(color, Colors.black, 0.28)!,
-          ],
-          const [0, 0.45, 1],
-        ),
-    );
-    final highlight = RRect.fromRectAndRadius(
-      Rect.fromLTWH(
-        rect.left + rect.width * 0.12,
-        rect.top + rect.height * 0.1,
-        rect.width * 0.76,
-        rect.height * 0.22,
-      ),
-      const Radius.circular(3),
-    );
-    canvas.drawRRect(highlight, Paint()..color = const Color(0x66FFFFFF));
-  }
-
   @override
   bool shouldRepaint(covariant BoardPainter oldDelegate) {
     return oldDelegate.field != field ||
@@ -219,7 +240,7 @@ class BoardPainter extends CustomPainter {
   }
 }
 
-/// Small 4×4 preview of the upcoming piece.
+/// Centered preview of the upcoming piece.
 class PreviewPainter extends CustomPainter {
   PreviewPainter({required PieceType? type})
     : cells = type == null ? null : previewMatrix(type),
@@ -230,16 +251,16 @@ class PreviewPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    const grid = 4;
-    final cell = size.shortestSide / grid;
     final shape = cells;
     if (shape == null || colorByte == null) {
       return;
     }
     final height = shape.length;
     final width = shape.first.length;
-    final ox = ((grid - width) * cell) / 2;
-    final oy = ((grid - height) * cell) / 2;
+    // Same cell size for every piece: room for a flat I or a two-row piece.
+    final cell = math.min(size.width / 4, size.height / 2);
+    final ox = (size.width - width * cell) / 2;
+    final oy = (size.height - height * cell) / 2;
     const inset = 1.2;
     final color = Neon.block(colorByte!);
     for (var row = 0; row < height; row++) {
@@ -253,15 +274,7 @@ class PreviewPainter extends CustomPainter {
           cell - inset * 2,
           cell - inset * 2,
         );
-        final body = RRect.fromRectAndRadius(rect, const Radius.circular(3));
-        canvas.drawRRect(body, Paint()..color = color);
-        canvas.drawRRect(
-          body,
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 1
-            ..color = Colors.white.withValues(alpha: 0.35),
-        );
+        paintNeonCell(canvas, rect, color);
       }
     }
   }

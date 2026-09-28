@@ -6,6 +6,7 @@ import '../../providers/game_provider.dart';
 import '../theme/neon.dart';
 import '../widgets/control_legend.dart';
 import '../widgets/neon_backdrop.dart';
+import '../widgets/neon_panel.dart';
 import 'game_screen.dart';
 
 class LandingScreen extends ConsumerWidget {
@@ -38,18 +39,9 @@ class LandingScreen extends ConsumerWidget {
                           ),
                         ).animate().fadeIn(duration: 400.ms),
                         const SizedBox(height: 10),
-                        FittedBox(
+                        const FittedBox(
                               fit: BoxFit.scaleDown,
-                              child: Text(
-                                'TETRIS',
-                                textAlign: TextAlign.center,
-                                style: orbitron(
-                                  56,
-                                  weight: FontWeight.w900,
-                                  letterSpacing: 6,
-                                  shadows: titleGlow(),
-                                ),
-                              ),
+                              child: NeonTitle(size: 60),
                             )
                             .animate()
                             .fadeIn(duration: 500.ms)
@@ -146,29 +138,40 @@ class _BestScore extends StatelessWidget {
   Widget build(BuildContext context) {
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 280),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          gradient: const LinearGradient(
-            colors: <Color>[Color(0xCC1A0B2E), Color(0xCC0C1C33)],
-          ),
-          border: Border.all(color: Neon.violet.withValues(alpha: 0.45)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
-          child: Column(
-            children: <Widget>[
-              Text(
-                'BEST',
-                style: rajdhani(13, color: Neon.cyan, letterSpacing: 3),
+      child: NeonPanel(
+        color: const Color(0xFFB45CFF),
+        radius: 20,
+        glow: 0.4,
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Text(
+              'BEST',
+              style: rajdhani(
+                14,
+                color: Neon.cyan,
+                weight: FontWeight.w700,
+                letterSpacing: 3,
               ),
-              const SizedBox(height: 4),
-              Text(
-                '$score',
-                style: orbitron(32, color: Neon.amber, letterSpacing: 1),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '$score',
+              style: orbitron(
+                34,
+                color: Neon.amber,
+                weight: FontWeight.w900,
+                letterSpacing: 1,
+                shadows: <Shadow>[
+                  Shadow(
+                    color: Neon.amber.withValues(alpha: 0.6),
+                    blurRadius: 16,
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

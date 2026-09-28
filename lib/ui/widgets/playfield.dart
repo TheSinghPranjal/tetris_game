@@ -6,6 +6,7 @@ import '../../game/game_model.dart';
 import '../../providers/game_provider.dart';
 import '../painter/board_painter.dart';
 import '../theme/neon.dart';
+import 'neon_panel.dart';
 
 class Playfield extends ConsumerStatefulWidget {
   const Playfield({super.key});
@@ -59,17 +60,15 @@ class _PlayfieldState extends ConsumerState<Playfield>
             height: height,
             child: DecoratedBox(
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(18),
-                boxShadow: <BoxShadow>[
+                borderRadius: BorderRadius.circular(BoardPainter.radius),
+                boxShadow: const <BoxShadow>[
+                  BoxShadow(color: Color(0x663D9BFF), blurRadius: 22),
                   BoxShadow(
-                    color: Neon.cyan.withValues(alpha: 0.16),
-                    blurRadius: 28,
+                    color: Color(0x406FE7FF),
+                    blurRadius: 6,
                     spreadRadius: 1,
                   ),
-                  BoxShadow(
-                    color: Neon.magenta.withValues(alpha: 0.12),
-                    blurRadius: 42,
-                  ),
+                  BoxShadow(color: Color(0x33B14DFF), blurRadius: 48),
                 ],
               ),
               child: GestureDetector(
@@ -87,7 +86,7 @@ class _PlayfieldState extends ConsumerState<Playfield>
                       );
                 },
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(BoardPainter.radius),
                   child: Stack(
                     fit: StackFit.expand,
                     children: <Widget>[
@@ -141,20 +140,22 @@ class _LineCallout extends StatelessWidget {
     };
     return IgnorePointer(
       child:
-          DecoratedBox(
-                decoration: BoxDecoration(
-                  color: const Color(0xCC07010F),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: Neon.amber.withValues(alpha: 0.8)),
+          NeonPanel(
+                color: Neon.amber,
+                radius: 999,
+                glow: 0.5,
+                fill: const Color(0xD90B0826),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 7,
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 6,
-                  ),
-                  child: Text(
-                    label,
-                    style: orbitron(13, color: Neon.amber, letterSpacing: 2),
+                child: Text(
+                  label,
+                  style: orbitron(
+                    14,
+                    color: Neon.amber,
+                    weight: FontWeight.w900,
+                    letterSpacing: 2,
                   ),
                 ),
               )
@@ -167,6 +168,7 @@ class _LineCallout extends StatelessWidget {
   }
 }
 
+/// Glass card over the well for start, pause, and game over.
 class _BoardMessage extends StatelessWidget {
   const _BoardMessage({required this.state});
 
@@ -174,51 +176,97 @@ class _BoardMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final over = state.status == GameStatus.over;
-    final paused = state.status == GameStatus.paused;
+    final (title, action) = switch (state.status) {
+      GameStatus.over => ('GAME OVER', 'TAP TO PLAY'),
+      GameStatus.paused => ('PAUSED', 'TAP TO RESUME'),
+      _ => ('READY?', 'TAP TO START'),
+    };
     return IgnorePointer(
-      child: DecoratedBox(
-        decoration: const BoxDecoration(color: Color(0xB307010F)),
+      child: ColoredBox(
+        color: const Color(0x4D07010F),
         child: Center(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Text(
-                  over
-                      ? 'GAME OVER'
-                      : paused
-                      ? 'PAUSED'
-                      : 'TAP TO START',
-                  textAlign: TextAlign.center,
-                  style: orbitron(
-                    over ? 26 : 22,
-                    letterSpacing: 2.4,
-                    shadows: titleGlow(),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: NeonPanel(
+              color: const Color(0xFF7A6CFF),
+              radius: 22,
+              glow: 0.4,
+              fill: const Color(0xD90B0826),
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 18),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      style: orbitron(
+                        28,
+                        weight: FontWeight.w900,
+                        letterSpacing: 1.6,
+                        shadows: const <Shadow>[
+                          Shadow(color: Color(0x99B14DFF), blurRadius: 16),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-                if (over) ...<Widget>[
-                  const SizedBox(height: 12),
-                  Text(
-                    '${state.displayedScore}',
-                    style: orbitron(32, color: Neon.amber, letterSpacing: 1),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'TAP TO PLAY',
-                    style: rajdhani(16, color: Neon.cyan, letterSpacing: 2),
-                  ),
+                  if (state.status == GameStatus.over) ...<Widget>[
+                    const SizedBox(height: 8),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        '${state.displayedScore}',
+                        style: orbitron(
+                          40,
+                          color: Neon.amber,
+                          weight: FontWeight.w900,
+                          letterSpacing: 1,
+                          shadows: <Shadow>[
+                            Shadow(
+                              color: Neon.amber.withValues(alpha: 0.6),
+                              blurRadius: 16,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 14),
+                  _ActionPill(label: action),
                 ],
-                if (paused) ...<Widget>[
-                  const SizedBox(height: 10),
-                  Text(
-                    'TAP TO RESUME',
-                    style: rajdhani(16, color: Neon.cyan, letterSpacing: 2),
-                  ),
-                ],
-              ],
+              ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ActionPill extends StatelessWidget {
+  const _ActionPill({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return NeonPanel(
+      color: Neon.cyan,
+      radius: 999,
+      glow: 0.5,
+      borderWidth: 1.8,
+      fill: const Color(0xCC0A2A3A),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          label,
+          style: rajdhani(
+            17,
+            color: Neon.cyan,
+            weight: FontWeight.w700,
+            letterSpacing: 2.4,
           ),
         ),
       ),
