@@ -18,7 +18,7 @@ class GameControls extends ConsumerWidget {
         ref.read(gameProvider.notifier).handleMotion(motion);
 
     return SizedBox(
-      height: 80,
+      height: 64,
       child: Row(
         children: <Widget>[
           _PadButton(
@@ -181,7 +181,7 @@ class _PadButtonState extends State<_PadButton> {
                   children: <Widget>[
                     Icon(
                       widget.icon,
-                      size: 28,
+                      size: 24,
                       color: accent,
                       shadows: <Shadow>[
                         Shadow(
@@ -190,13 +190,13 @@ class _PadButtonState extends State<_PadButton> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 2),
                     FittedBox(
                       fit: BoxFit.scaleDown,
                       child: Text(
                         widget.label,
                         style: rajdhani(
-                          14,
+                          12,
                           color: Neon.ink,
                           weight: FontWeight.w700,
                           letterSpacing: 1,

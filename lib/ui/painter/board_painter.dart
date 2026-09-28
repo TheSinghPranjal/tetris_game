@@ -153,11 +153,12 @@ class BoardPainter extends CustomPainter {
     final border = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2
-      ..shader = ui.Gradient.linear(board.topCenter, board.bottomCenter, const [
-        Color(0xFF6FE7FF),
-        Color(0xFF3D7BFF),
-        Color(0xFF6FE7FF),
-      ]);
+      ..shader = ui.Gradient.linear(
+        board.topCenter,
+        board.bottomCenter,
+        const [Color(0xFF6FE7FF), Color(0xFF3D7BFF), Color(0xFF6FE7FF)],
+        const [0, 0.5, 1],
+      );
     canvas.drawRRect(well.deflate(1), border);
   }
 

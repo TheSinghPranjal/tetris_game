@@ -65,7 +65,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
         body: NeonBackdrop(
           child: SafeArea(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 4, 14, 10),
+              padding: const EdgeInsets.fromLTRB(10, 2, 10, 6),
               child: Column(
                 children: <Widget>[
                   _TopBar(
@@ -77,11 +77,11 @@ class _GameScreenState extends ConsumerState<GameScreen>
                         ref.read(gameProvider.notifier).togglePause(),
                     onRestart: () => ref.read(gameProvider.notifier).restart(),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   _Hud(state: state),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 10),
                   const Expanded(child: Playfield()),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 10),
                   const GameControls(),
                 ],
               ),
@@ -159,14 +159,14 @@ class _TopBar extends StatelessWidget {
   final VoidCallback onPause;
   final VoidCallback onRestart;
 
-  static const double _button = 46;
+  static const double _button = 40;
 
   @override
   Widget build(BuildContext context) {
     // Both sides reserve the same width so the title stays centered.
     const side = _button * 2 + 8;
     return SizedBox(
-      height: 58,
+      height: 44,
       child: Row(
         children: <Widget>[
           SizedBox(
@@ -233,7 +233,7 @@ class _TitleLockup extends StatelessWidget {
             ),
           ),
           SizedBox(width: 8),
-          NeonTitle(size: 30),
+          NeonTitle(size: 26),
           SizedBox(width: 6),
           Padding(
             padding: EdgeInsets.only(bottom: 18),
@@ -285,7 +285,7 @@ class _RoundIcon extends StatelessWidget {
                 ),
               ],
             ),
-            child: Icon(icon, color: Neon.cyan, size: 24),
+            child: Icon(icon, color: Neon.cyan, size: 22),
           ),
         ),
       ),
@@ -301,7 +301,7 @@ class _Hud extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 66,
+      height: 58,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
@@ -368,7 +368,7 @@ class _Stat extends StatelessWidget {
       color: color,
       radius: 14,
       glow: 0.3,
-      padding: const EdgeInsets.fromLTRB(8, 8, 8, 6),
+      padding: const EdgeInsets.fromLTRB(6, 6, 6, 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: <Widget>[
@@ -402,7 +402,7 @@ class _Stat extends StatelessWidget {
             child: Text(
               '$value',
               style: orbitron(
-                24,
+                22,
                 color: Neon.ink,
                 weight: FontWeight.w900,
                 letterSpacing: 0.5,
@@ -459,7 +459,7 @@ class _NextWell extends StatelessWidget {
       color: Neon.cyan,
       radius: 14,
       glow: 0.3,
-      padding: const EdgeInsets.fromLTRB(6, 8, 6, 6),
+      padding: const EdgeInsets.fromLTRB(6, 6, 6, 4),
       child: Column(
         children: <Widget>[
           Text(
