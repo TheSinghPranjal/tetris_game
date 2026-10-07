@@ -27,7 +27,7 @@ void main() {
                 (int max) => 0,
           ),
         ],
-        child: const TetrisApp(),
+        child: const BlockStackApp(),
       ),
     );
     await tester.pump();

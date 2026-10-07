@@ -1,6 +1,6 @@
-# Tetris
+# Block Stack
 
-A portrait Flutter Tetris game with the rules of [Landfathich/Tetris](https://github.com/Landfathich/Tetris) and a dark neon arcade UI.
+A portrait Flutter falling-block game with the rules of the [Landfathich Android game](https://github.com/Landfathich/Tetris) and a dark neon arcade UI.
 
 ## Run
 
@@ -25,7 +25,7 @@ Riverpod owns the session. The UI only paints snapshots and forwards input.
 | `lib/game/board.dart` | 20×10 well, collision, and `assessField` / `shiftRows` line clear |
 | `lib/game/game_model.dart` | Statuses, motions, lock, +10 score, high score, spawn game over |
 | `lib/game/motions.dart` | `LEFT` / `RIGHT` / `DOWN` / `ROTATE` and the diagonal touch split |
-| `lib/game/tick.dart` | 500ms soft-drop cadence from `TetrisView` |
+| `lib/game/tick.dart` | 500ms soft-drop cadence |
 | `lib/providers/` | `GameNotifier`, gravity timer, `shared_preferences` high score |
 | `lib/ui/` | Landing, game HUD, and `CustomPainter` well |
 
