@@ -136,7 +136,7 @@ class _LineCallout extends StatelessWidget {
       1 => 'SINGLE',
       2 => 'DOUBLE',
       3 => 'TRIPLE',
-      _ => 'TETRIS!',
+      _ => 'QUAD!',
     };
     return IgnorePointer(
       child:

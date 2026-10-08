@@ -62,7 +62,7 @@ class GameControls extends ConsumerWidget {
 }
 
 /// Fires on touch-down (no tap delay). With [repeat], holding it auto-repeats
-/// after a short delay, like DAS/ARR in Tetris.
+/// after a short delay, like delayed auto-shift (DAS/ARR).
 class _PadButton extends StatefulWidget {
   const _PadButton({
     super.key,

@@ -53,7 +53,7 @@ class NeonPanel extends StatelessWidget {
   }
 }
 
-/// "TETRIS" wordmark: violet → cyan → pink gradient with a neon glow.
+/// "BLOCK STACK" wordmark: violet → cyan → pink gradient with a neon glow.
 class NeonTitle extends StatelessWidget {
   const NeonTitle({super.key, this.size = 30});
 
@@ -72,13 +72,13 @@ class NeonTitle extends StatelessWidget {
     final style = orbitron(
       size,
       weight: FontWeight.w900,
-      letterSpacing: size * 0.08,
+      letterSpacing: size * 0.045,
     );
     return Stack(
       children: <Widget>[
         // Glow layer.
         Text(
-          'TETRIS',
+          'BLOCK STACK',
           style: style.copyWith(
             color: Colors.transparent,
             shadows: const <Shadow>[
@@ -91,7 +91,7 @@ class NeonTitle extends StatelessWidget {
           blendMode: BlendMode.srcIn,
           shaderCallback: (bounds) =>
               const LinearGradient(colors: colors).createShader(bounds),
-          child: Text('TETRIS', style: style),
+          child: Text('BLOCK STACK', style: style),
         ),
       ],
     );

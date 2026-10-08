@@ -56,7 +56,7 @@ class GameSnapshot {
   int get displayedScore => score;
 }
 
-/// Guideline Tetris rules: SRS rotation with wall kicks, 7-bag, soft and
+/// Guideline falling-block rules: SRS rotation with wall kicks, 7-bag, soft and
 /// hard drop, level-based gravity, and standard line-clear scoring.
 class GameModel {
   GameModel({

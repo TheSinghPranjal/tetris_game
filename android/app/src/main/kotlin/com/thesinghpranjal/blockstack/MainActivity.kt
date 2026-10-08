@@ -1,4 +1,4 @@
-package com.the_lazy_bear_club.tetris_game
+package com.thesinghpranjal.blockstack
 
 import io.flutter.embedding.android.FlutterActivity
 

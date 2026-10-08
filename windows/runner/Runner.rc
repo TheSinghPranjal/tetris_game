@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.the_lazy_bear_club" "\0"
-            VALUE "FileDescription", "tetris_game" "\0"
+            VALUE "FileDescription", "Block Stack" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "tetris_game" "\0"
+            VALUE "InternalName", "block_stack" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.the_lazy_bear_club. All rights reserved." "\0"
-            VALUE "OriginalFilename", "tetris_game.exe" "\0"
-            VALUE "ProductName", "tetris_game" "\0"
+            VALUE "OriginalFilename", "block_stack.exe" "\0"
+            VALUE "ProductName", "Block Stack" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

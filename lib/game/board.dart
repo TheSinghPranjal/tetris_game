@@ -6,7 +6,7 @@ abstract final class Cell {
 }
 
 /// 20×10 well. Rows above the top (negative indexes) count as open space so
-/// pieces can spawn and rotate partly out of view, as in guideline Tetris.
+/// pieces can spawn and rotate partly out of view, as in guideline falling-block games.
 class Board {
   Board() : cells = List<List<int>>.generate(rowCount, (_) => _emptyRow());
 

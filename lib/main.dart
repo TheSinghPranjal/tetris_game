@@ -18,16 +18,16 @@ Future<void> main() async {
       systemNavigationBarIconBrightness: Brightness.light,
     ),
   );
-  runApp(const ProviderScope(child: TetrisApp()));
+  runApp(const ProviderScope(child: BlockStackApp()));
 }
 
-class TetrisApp extends StatelessWidget {
-  const TetrisApp({super.key});
+class BlockStackApp extends StatelessWidget {
+  const BlockStackApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Tetris',
+      title: 'Block Stack',
       debugShowCheckedModeBanner: false,
       theme: neonTheme(),
       home: const LandingScreen(),

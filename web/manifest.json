@@ -1,11 +1,11 @@
 {
-    "name": "Tetris",
-    "short_name": "Tetris",
+    "name": "Block Stack",
+    "short_name": "Block Stack",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#07010F",
     "theme_color": "#07010F",
-    "description": "Neon Tetris",
+    "description": "Neon falling-block game",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
